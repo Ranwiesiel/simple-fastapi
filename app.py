@@ -1,7 +1,7 @@
 from typing import Annotated
 
 import uvicorn
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Body
 from sqlmodel import Field, SQLModel, create_engine, select, Session
 
 # sqlite database connection using sqlmodel
@@ -27,10 +27,52 @@ class User(SQLModel, table=True):
     
 
 # init fastapi
-app = FastAPI()
+app = FastAPI(
+    title="Simple FastAPI",
+    description="Simple REST API with GET, POST, and DELETE operations documentations"
+)
 
 # get data
-@app.get("/api/users", status_code=200)
+@app.get("/api/users", status_code=200, tags=["users"],
+        responses={
+            200: {
+                "description": "Sukses",
+                "content": {
+                    "application/json": {
+                        "example": { 
+                            "status": 200,
+                            "message": "Success",
+                            "data": [
+                                {
+                                    "id": 1,
+                                    "nama": "Ronggo Widjoyo",
+                                    "umur": 20,
+                                    "alamat": "Lamongan"
+                                },
+                                {
+                                    "id": 2,
+                                    "nama": "Ronggo Widjoyo",
+                                    "umur": 20,
+                                    "alamat": "Lamongan"
+                                },
+                            ]
+                        },
+                    }
+                }
+            },
+            404: {
+                "description": "Tidak ditemukan",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            "status": 404,
+                            "detail": "Tidak ada data"
+                        }
+                    }
+                }
+            }
+        }
+)
 def get_data(session: SessionDep):
     """
     Menampilkan semua data User dalam database
@@ -45,8 +87,39 @@ def get_data(session: SessionDep):
     }
 
 # insert data
-@app.post("/api/user", status_code=201)
-def create_user(id: int, nama: str, umur: int, alamat: str, session: SessionDep):
+@app.post("/api/user", status_code=201, tags=["users"],
+          responses={
+              201: {
+                  "description": "Berhasil membuat user",
+                  "content": {
+                      "application/json": {
+                          "example": {
+                              "status": 201,
+                              "message": "User berhasil dibuat",
+                              "data": {
+                                  "id": 1,
+                                  "nama": "Ronggo Widjoyo",
+                                  "umur": 20,
+                                  "alamat": "Lamongan"
+                              }
+                          }
+                      }
+                  }
+              },
+              400: {
+                  "description": "Bad Request",
+                  "content": {
+                      "application/json": {
+                          "example": {
+                              "status": 400,
+                              "detail": "Coba dengan id berbeda"
+                          }
+                      }
+                  }
+              }
+          }
+          )
+def create_user(id: int, nama: str, umur: int, alamat: str, session: SessionDep, user: Annotated[User, Body(examples=[{"id": 1, "nama": "Ronggo Widjoyo", "umur": 20, "alamat": "Lamongan"}])]):
     """
     Mambahkan data user ke dalam database
     """
@@ -60,8 +133,32 @@ def create_user(id: int, nama: str, umur: int, alamat: str, session: SessionDep)
         raise HTTPException(status_code=400, detail="Coba dengan id berbeda")
 
 # delete data
-@app.delete("/api/user/{user_id}", status_code=200)
-def delete_user(user_id: int, session: SessionDep):
+@app.delete("/api/user/{user_id}", status_code=200, tags=["users"],
+            responses={
+                200: {
+                    "description": "Berhasil menghapus user",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "status": 200,
+                                "message": "Data berhasil dihapus"
+                            }
+                        }
+                    }
+                },
+                404: {
+                    "description": "User tidak ditemukan",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "status": 404,
+                                "detail": "User tidak ditemukan"
+                            }
+                        }
+                    }
+                }
+            })
+def delete_user(user_id: int, session: SessionDep, user: Annotated[User, Body(examples=[{"id": 1}])]):
     """
     Menghapus data user berdasarkan id dalam database
     """
