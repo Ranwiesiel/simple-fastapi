@@ -20,6 +20,7 @@ pip install -r requirements.txt
 
 
 ```bash
+$ cd app # you should run in it, because there is database in it
 $ py app.py
 ```
 

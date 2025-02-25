@@ -1,65 +1,17 @@
-from typing import Annotated
+from typing import Annotated, List
 
-import uvicorn
-from fastapi import FastAPI, Depends, HTTPException, Body
-from sqlmodel import Field, SQLModel, create_engine, select, Session
+from fastapi import HTTPException, Body, APIRouter
+from sqlmodel import select
 
-# sqlite database connection using sqlmodel
-sqlite_file = "user.db"
-sqlite_url = f"sqlite:///{sqlite_file}"
-
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, connect_args=connect_args)
-
-def get_session():
-    with Session(engine) as session:
-        yield session
-
-SessionDep = Annotated[Session, Depends(get_session)]
+from connection import SessionDep
+from schemas import User
 
 
-# user validation schema
-class User(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    nama: str = Field(index=True)
-    umur: int | None = Field(default=None, index=True)
-    alamat: str | None = Field(default=None)
-    
+user_router = APIRouter()
 
-# init fastapi
-app = FastAPI(
-    title="Simple FastAPI",
-    description="Simple REST API with GET, POST, and DELETE operations documentations"
-)
-
-# get data
-@app.get("/api/users", status_code=200, tags=["users"],
+# get all users
+@user_router.get("/", status_code=200, response_model=List[User],
         responses={
-            200: {
-                "description": "Sukses",
-                "content": {
-                    "application/json": {
-                        "example": { 
-                            "status": 200,
-                            "message": "Success",
-                            "data": [
-                                {
-                                    "id": 1,
-                                    "nama": "Ronggo Widjoyo",
-                                    "umur": 20,
-                                    "alamat": "Lamongan"
-                                },
-                                {
-                                    "id": 2,
-                                    "nama": "Ronggo Widjoyo",
-                                    "umur": 20,
-                                    "alamat": "Lamongan"
-                                },
-                            ]
-                        },
-                    }
-                }
-            },
             404: {
                 "description": "Tidak ditemukan",
                 "content": {
@@ -72,22 +24,43 @@ app = FastAPI(
                 }
             }
         }
-)
-def get_data(session: SessionDep):
+    )
+def get_all_users(session: SessionDep):
     """
     Menampilkan semua data User dalam database
     """
     users = session.exec(select(User)).all()
     if not users:
         raise HTTPException(status_code=404, detail="Tidak ada data")
-    return {
-        "status": 200,
-        "message": "Success",
-        "data": [user.model_dump() for user in users]
-    }
+    return users
+
+# get user
+@user_router.get("/{user_id}", status_code=200, response_model=User,
+                 responses={
+                        404: {
+                            "description": "User tidak ditemukan",
+                            "content": {
+                                "application/json": {
+                                    "example": {
+                                        "status": 404,
+                                        "detail": "User tidak ada"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                 )
+def get_user(user_id: int, session: SessionDep):
+    """
+    Mengambil data user berdasarkan *id* user
+    """
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ada")
+    return user.model_dump()
 
 # insert data
-@app.post("/api/user", status_code=201, tags=["users"],
+@user_router.post("/", status_code=201,
           responses={
               201: {
                   "description": "Berhasil membuat user",
@@ -119,21 +92,26 @@ def get_data(session: SessionDep):
               }
           }
           )
-def create_user(id: int, nama: str, umur: int, alamat: str, session: SessionDep, user: Annotated[User, Body(examples=[{"id": 1, "nama": "Ronggo Widjoyo", "umur": 20, "alamat": "Lamongan"}])]):
+def create_user(user: Annotated[User, Body(examples=[{"id": 1, "nama": "Ronggo Widjoyo", "umur": 20, "alamat": "Lamongan"}])], session: SessionDep):
     """
     Mambahkan data user ke dalam database
     """
+    user_sekarang = session.get(User, user.id)
+    if user_sekarang:
+        raise HTTPException(status_code=400, detail="Coba dengan id berbeda")
+    
     try:
-        user = User(id=id, nama=nama, umur=umur, alamat=alamat)
         session.add(user)
+        session.flush()
         session.commit()
         session.refresh(user)
         return {"status": 201, "message": "User berhasil dibuat", "data": user.model_dump()}
-    except:
-        raise HTTPException(status_code=400, detail="Coba dengan id berbeda")
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal membuat user: {str(e)}")
 
 # delete data
-@app.delete("/api/user/{user_id}", status_code=200, tags=["users"],
+@user_router.delete("/{user_id}", status_code=200,
             responses={
                 200: {
                     "description": "Berhasil menghapus user",
@@ -158,18 +136,17 @@ def create_user(id: int, nama: str, umur: int, alamat: str, session: SessionDep,
                     }
                 }
             })
-def delete_user(user_id: int, session: SessionDep, user: Annotated[User, Body(examples=[{"id": 1}])]):
+def delete_user(user_id: int, session: SessionDep):
     """
     Menghapus data user berdasarkan id dalam database
     """
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
-    session.delete(user)
-    session.commit()
-    return {"status": 200, "message": "Data berhasil dihapus"}
-
-
-
-if __name__ == '__main__':
-    uvicorn.run(app, port=8000)
+    try:
+        session.delete(user)
+        session.commit()
+        return {"status": 200, "message": "Data berhasil dihapus"}
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal menghapus user: {str(e)}")
