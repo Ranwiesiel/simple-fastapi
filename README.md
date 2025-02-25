@@ -26,7 +26,7 @@ $ py app.py
 
 ## API DOCUMENTATION
 
-Run `app.py` and access http://127.0.0.1:8000/docs
+Run `app.py` and access http://127.0.0.1:8000/api/docs
 
 ![](https://raw.githubusercontent.com/ranwiesiel/simple-fastapi/main/doc.png)
 
