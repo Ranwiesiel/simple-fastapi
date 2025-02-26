@@ -20,13 +20,13 @@ pip install -r requirements.txt
 
 
 ```bash
-$ cd app # you should run in it, because there is database in it
-$ py app.py
+$ cd main # you should run in it, because there is database in it
+$ py main.py
 ```
 
 ## API DOCUMENTATION
 
-Run `app.py` and access http://127.0.0.1:8000/api/docs
+Run `main.py` and access http://127.0.0.1:8000/api/docs
 
 ![](https://raw.githubusercontent.com/ranwiesiel/simple-fastapi/main/doc.png)
 
